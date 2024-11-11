@@ -23,7 +23,6 @@ The Clean Sweep system consists of several core modules:
 
 ### ***BackEnd***
 ### 1. Common
-- **ConfigManager**: Manages system configurations (e.g., file paths, floor plans).
 - **Enums**: Direction (UP, DOWN, LEFT, RIGHT), FloorType (BARE_FLOOR, LOW_PILE_CARPET, HIGH_PILE_CARPET).
 
 ### 2. Model (Domain)
@@ -49,7 +48,7 @@ The Clean Sweep system consists of several core modules:
 - **HUDController**: Displays battery status, dirt level, and system status.
 
 ## Key Functionalities
-- **BFS Navigation**: Ensures the vacuum systematically moves, avoiding obstacles.
+- **DFS Navigation**: Ensures the vacuum systematically moves, avoiding obstacles.
 - **Battery Management**: Returns the vacuum to the charging station when power is low.
 - **Dirt Detection**: Cleans dirty cells as the vacuum traverses the floor.
 - **Sensor Simulation**: Mimics real-world sensor data (e.g., floor types, dirt levels, obstacles).
@@ -101,5 +100,3 @@ https://github.com/user-attachments/assets/6c3fbc9a-ed42-43bf-b38e-030716b1f209
 To build and run the application, use the following command:
 ```sh
 mvn javafx:run
-
-
