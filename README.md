@@ -66,7 +66,11 @@ The system is covered by unit tests for all major modules:
 - **Application Properties**: Configured in `resources/application.properties` (e.g., grid size, battery capacity, dirt levels).
 
 ## Robot Clean 
-https://github.com/user-attachments/assets/2cd2eb55-2add-46fd-83a0-0e6a4a4cd6d5
+
+
+https://github.com/user-attachments/assets/6c3fbc9a-ed42-43bf-b38e-030716b1f209
+
+
 
 ## BackEnd Running Condition
 ![73fd3f55a80079a7fe355f117cc89fb](https://github.com/user-attachments/assets/f907a2ca-377e-408e-b211-4fa8b63937ec)
