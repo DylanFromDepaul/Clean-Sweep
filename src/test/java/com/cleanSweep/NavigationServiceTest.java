@@ -77,7 +77,7 @@ class NavigationServiceTest {
     @Test
     void testNavigationToChargingStation() {
         // Set up a low battery scenario
-        when(batteryService.isRechargeNeeded(anyInt())).thenReturn(true);
+        when(batteryService.isRechargeNeeded(anyDouble())).thenReturn(true);
         cells[0][0].setChargingStation(true);
 
         navigationService.startNavigation(1, 1);
