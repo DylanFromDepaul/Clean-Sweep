@@ -61,7 +61,6 @@ The system is covered by unit tests for all major modules:
 - **CleanSweepSystemApplicationTests**: Ensures seamless module integration.
 
 ## Resources
-- **Floor Plans**: Stored in `resources/templates/floorPlan.json`.
 - **Application Properties**: Configured in `resources/application.properties` (e.g., grid size, battery capacity, dirt levels).
 
 ## Robot Clean 
