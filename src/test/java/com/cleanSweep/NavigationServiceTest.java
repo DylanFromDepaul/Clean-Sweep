@@ -45,7 +45,7 @@ class NavigationServiceTest {
         cells = new Cell[5][5];
         for (int i = 0; i < 5; i++) {
             for (int j = 0; j < 5; j++) {
-                cells[i][j] = new Cell(i, j, FloorType.BARE_FLOOR, false, false, false, false, 0, null);
+                cells[i][j] = new Cell(i, j, FloorType.BARE_FLOOR, false, false, false, false, 0, null,0);
             }
         }
         when(floorMap.getCells()).thenReturn(cells);

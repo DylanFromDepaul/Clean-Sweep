@@ -43,7 +43,7 @@ class SensorSimulatorServiceTest {
         cells = new Cell[5][5];
         for (int i = 0; i < 5; i++) {
             for (int j = 0; j < 5; j++) {
-                cells[i][j] = new Cell(i, j, FloorType.BARE_FLOOR, false, false, false, false, 0, null);
+                cells[i][j] = new Cell(i, j, FloorType.BARE_FLOOR, false, false, false, false, 0, null,0);
             }
         }
         when(floorMap.getCells()).thenReturn(cells);
@@ -83,9 +83,9 @@ class SensorSimulatorServiceTest {
         cells[2][2].setFloorType(FloorType.LOW_PILE_CARPET);
         cells[3][3].setFloorType(FloorType.HIGH_PILE_CARPET);
 
-        assertEquals(1, sensorSimulatorService.getSurfacePowerCost(1, 1));
-        assertEquals(2, sensorSimulatorService.getSurfacePowerCost(2, 2));
-        assertEquals(3, sensorSimulatorService.getSurfacePowerCost(3, 3));
+        assertEquals(1, sensorSimulatorService.getSurfaceUnit(cells[1][1]));
+        assertEquals(2, sensorSimulatorService.getSurfaceUnit(cells[2][2]));
+        assertEquals(3, sensorSimulatorService.getSurfaceUnit(cells[3][3]));
     }
 
     @Test

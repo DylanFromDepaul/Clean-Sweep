@@ -19,8 +19,8 @@ public class ActivityLogger {
         logRepo.saveLog(message);
     }
 
-    public void logBatteryUsage(int batteryLife) {
-        String message = String.format("Battery remaining: %d units", batteryLife);
+    public void logBatteryUsage(double batteryLife) {
+        String message = String.format("Battery remaining: %.1f units", batteryLife);
         logger.info(message);
         logRepo.saveLog(message);
     }

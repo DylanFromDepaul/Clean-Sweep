@@ -20,6 +20,7 @@ public class Cell {
     private boolean isStairs;
     private int dirtLevel;
     private List<int[]> wayToChargingStation;
+    private double distanceToStation;
 
     public void reduceDirtLevel() {
         if (dirtLevel > 0) {

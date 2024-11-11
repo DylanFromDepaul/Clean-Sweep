@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 public class BatteryService {
 
     @Getter
-    private int battery;
+    private double battery;
 
     @Value("${clean-sweep.battery.low-threshold}")
     private int lowBatteryThreshold;
@@ -32,7 +32,7 @@ public class BatteryService {
      * Consumes a specified amount of power from the battery.
      * If the battery is insufficient, it triggers a recharge.
      */
-    public void consumePower(int units) {
+    public void consumePower(double units) {
         if (battery > units) {
             battery -= units;
             activityLogger.logBatteryUsage(battery);
@@ -46,8 +46,8 @@ public class BatteryService {
      * Checks if a recharge is needed based on the current battery level
      * and the battery needed to reach the charging station.
      */
-    public boolean isRechargeNeeded(int batteryToReachStation) {
-        return battery <= batteryToReachStation + 4 || battery <= fullChargeValue * 0.3;
+    public boolean isRechargeNeeded(double batteryToReachStation) {
+        return battery <= batteryToReachStation + 7;
     }
 
     /**

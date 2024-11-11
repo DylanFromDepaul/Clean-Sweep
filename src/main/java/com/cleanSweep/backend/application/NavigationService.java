@@ -21,6 +21,34 @@ import java.util.PriorityQueue;
  * It handles the robot's movement, cleaning operations, and charging station navigation
  * while maintaining efficient path planning and battery management.
  */
+
+/**
+ * Helper class to store coordinates and minimum distance
+ */
+class Node {
+    double dist;
+    int x;
+    int y;
+
+    public Node(double dist, int x, int y) {
+        this.dist = dist;
+        this.x = x;
+        this.y = y;
+    }
+}
+
+/**
+ * Helper class to store coordinates for path reconstruction.
+ */
+class Point {
+    int x, y;
+
+    Point(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+
 @Service
 public class NavigationService {
 
@@ -39,7 +67,7 @@ public class NavigationService {
     @Autowired
     private ActivityLogger activityLogger;
 
-    private Deque<Cell> stack = new ArrayDeque<>();
+    private Deque<Cell[]> stack = new ArrayDeque<>();
     private List<int[]> stationPath = new ArrayList<>();
     private int stationIdx;
 
@@ -53,18 +81,19 @@ public class NavigationService {
 
     /**
      * Initializes the navigation process from a starting position.
-     * Sets up initial paths to all charging stations and begins the cleaning operation.
+     * Sets up initial paths to all charging stations and begins the cleaning
+     * operation.
      */
     public void startNavigation(int startX, int startY) {
         if (!isNavigationCompleted && stack.isEmpty()) {
             startX = 0;
             startY = 0;
-            
+
             // Initialize paths from all charging stations before starting navigation
             initializeAllPaths();
-            
+
             Cell startCell = floorMap.getCells()[startX][startY];
-            stack.push(startCell);
+            stack.push(new Cell[] { null, startCell });
             startCell.setVisited(true);
 
             currentX = startX;
@@ -74,19 +103,20 @@ public class NavigationService {
     }
 
     /**
-     * Initializes the shortest paths from a charging station to all cells using BFS.
+     * Initializes the shortest paths from a charging station to all cells using
+     * BFS.
      * This method is used to pre-compute paths for efficient navigation.
      */
     public void initializeWayToChargingStation(int startX, int startY) {
         Cell startCell = floorMap.getCells()[startX][startY];
         List<int[]> startPath = new ArrayList<>();
-        startPath.add(new int[]{startX, startY});
+        startPath.add(new int[] { startX, startY });
         startCell.setWayToChargingStation(startPath);
         boolean[][] visit = new boolean[floorMap.getCells().length][floorMap.getCells()[0].length];
         visit[startX][startY] = true;
         Deque<Cell> queue = new ArrayDeque<>();
         queue.add(startCell);
-        while (!queue.isEmpty()){
+        while (!queue.isEmpty()) {
             Cell cell = queue.poll();
             int x = cell.getX();
             int y = cell.getY();
@@ -98,14 +128,14 @@ public class NavigationService {
                     Cell neighborCell = floorMap.getCells()[newX][newY];
                     visit[newX][newY] = true;
                     List<int[]> newPath = new ArrayList<>(path);
-                    newPath.add(new int[]{newX, newY});
+                    newPath.add(new int[] { newX, newY });
                     neighborCell.setWayToChargingStation(newPath);
                     queue.add(neighborCell);
                 }
             }
         }
     }
-    
+
     /**
      * Handles the robot's movement to and from charging stations.
      * Manages charging, dirt removal, and return path navigation.
@@ -116,13 +146,21 @@ public class NavigationService {
             stationIdx = 0;
             return;
         }
-
         int[] currCell = stationPath.get(stationIdx);
         currentX = currCell[0];
         currentY = currCell[1];
-
-        int floorPowerCost = sensorSimulatorService.getSurfacePowerCost(currentX, currentY);
-        batteryService.consumePower(floorPowerCost);
+        
+        // Reduce the battery if the current cell is not the lastest cell because the lastest cell is overlapped
+        if (currentX != lastCleaningX || currentY != lastCleaningY) {
+            Cell currentCell = floorMap.getCells()[currentX][currentY];
+            Cell previousCell = null;
+            if (stationIdx > 0) {
+                int[] preCell = stationPath.get(stationIdx - 1);
+                previousCell = floorMap.getCells()[preCell[0]][preCell[1]];
+            }
+            double movingPowerCost = sensorSimulatorService.getMovingPowerCost(previousCell, currentCell);
+            batteryService.consumePower(movingPowerCost);
+        }
 
         String direction = isReturningFromStation ? "Returning to cleaning position" : "Moving to charging station";
         activityLogger.logMovement(currentX, currentY, direction);
@@ -131,7 +169,7 @@ public class NavigationService {
         if (isAtAnyChargingStation() && !isReturningFromStation) {
             dirtService.removeDirt();
             batteryService.recharge();
-            
+
             if (stack.isEmpty()) {
                 isNavigationCompleted = true;
                 stationPath = null;
@@ -142,7 +180,7 @@ public class NavigationService {
                 Cell lastCleaningCell = floorMap.getCells()[lastCleaningX][lastCleaningY];
                 stationPath = new ArrayList<>(lastCleaningCell.getWayToChargingStation());
                 stationIdx = 0;
-                isReturningFromStation = true; 
+                isReturningFromStation = true;
             }
         } else if (isReturningFromStation && currentX == lastCleaningX && currentY == lastCleaningY) {
             // Returned to the last cleaning position
@@ -168,14 +206,17 @@ public class NavigationService {
 
     /**
      * Implements the cleaning navigation logic using DFS.
-     * Handles dirt cleaning, battery monitoring, and path planning to charging stations.
+     * Handles dirt cleaning, battery monitoring, and path planning to charging
+     * stations.
      */
     private void cleaningNavigation() {
         if (stack.isEmpty() || isNavigationCompleted) {
             return;
         }
 
-        Cell currentCell = stack.peek();
+        Cell[] cellPair = stack.peek();
+        Cell previousCell = cellPair[0]; // This could be null
+        Cell currentCell = cellPair[1];
         currentX = currentCell.getX();
         currentY = currentCell.getY();
 
@@ -185,24 +226,24 @@ public class NavigationService {
             return;
         }
 
-        int floorPowerCost = sensorSimulatorService.getSurfacePowerCost(currentX, currentY);
-        batteryService.consumePower(floorPowerCost);
-        
+        double movingPowerCost = sensorSimulatorService.getMovingPowerCost(previousCell, currentCell);
+        double cleaningPowerCost = sensorSimulatorService.getCleaningPowerCost(currentCell);
+        batteryService.consumePower(movingPowerCost + cleaningPowerCost);
+
         if (currentCell.getDirtLevel() > 0) {
             dirtService.cleanDirt(currentX, currentY);
         }
 
         // Check if returning to the charging station is needed
-        if (dirtService.isFullDirt() || batteryService.isRechargeNeeded(getBatteryNeededToNearestStation())) {
+        if (dirtService.isFullDirt() || batteryService.isRechargeNeeded(currentCell.getDistanceToStation())) {
             // Store the last cleaning position
             lastCleaningX = currentX;
             lastCleaningY = currentY;
-            
+
             dirtService.stopCleaningMode();
-            Cell nearestStation = findNearestChargingStationCell(currentX, currentY);
-            if (nearestStation != null) {
+            if (currentCell.getWayToChargingStation() != null) {
                 stationPath = new ArrayList<>(currentCell.getWayToChargingStation());
-                Collections.reverse(stationPath);  // Reverse the path to reach the charging station
+                Collections.reverse(stationPath); // Reverse the path to reach the charging station
                 stationIdx = 0;
                 isReturningFromStation = false;
                 return;
@@ -213,7 +254,7 @@ public class NavigationService {
 
         Cell nextCell = getNeighborCell();
         if (nextCell != null) {
-            stack.push(nextCell);
+            stack.push(new Cell[] { currentCell, nextCell });
             nextCell.setVisited(true);
         } else {
             stack.pop();
@@ -224,8 +265,7 @@ public class NavigationService {
                 lastCleaningX = currentX;
                 lastCleaningY = currentY;
                 dirtService.stopCleaningMode();
-                Cell nearestStation = findNearestChargingStationCell(currentX, currentY);
-                if (nearestStation != null) {
+                if (currentCell.getWayToChargingStation() != null) {
                     stationPath = new ArrayList<>(currentCell.getWayToChargingStation());
                     Collections.reverse(stationPath);
                     stationIdx = 0;
@@ -267,7 +307,7 @@ public class NavigationService {
      * Returns the current position of the robot as an array [x, y].
      */
     public int[] getCurrentPosition() {
-        return new int[]{currentX, currentY};
+        return new int[] { currentX, currentY };
     }
 
     /**
@@ -278,50 +318,34 @@ public class NavigationService {
     }
 
     /**
-     * Finds the nearest charging station coordinates using Manhattan distance.
-     */
-    private int[] findNearestChargingStation(int x, int y) {
-        int minDistance = Integer.MAX_VALUE;
-        int[] nearest = new int[]{0, 0};
-        
-        for (int i = 0; i < floorMap.getCells().length; i++) {
-            for (int j = 0; j < floorMap.getCells()[0].length; j++) {
-                if (floorMap.getCells()[i][j].isChargingStation()) {
-                    int distance = Math.abs(x - i) + Math.abs(y - j);
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        nearest[0] = i;
-                        nearest[1] = j;
-                    }
-                }
-            }
-        }
-        return nearest;
-    }
-
-    /**
      * Initializes optimal paths from all charging stations to all cells
      * using Dijkstra's algorithm.
      */
     private void initializeAllPaths() {
-        // Find paths from all charging stations and update each cell with the shortest path
+        // Find paths from all charging stations and update each cell with the shortest
+        // path
         List<int[]> chargingStations = findAllChargingStations();
         for (Cell[] row : floorMap.getCells()) {
             for (Cell cell : row) {
                 List<int[]> shortestPath = null;
-                int shortestDistance = Integer.MAX_VALUE;
-                
+                double shortestDistance = Double.MAX_VALUE;
+
                 // Find shortest path from each charging station
                 for (int[] station : chargingStations) {
-                    List<int[]> pathFromStation = findShortestPath(station[0], station[1], cell.getX(), cell.getY());
-                    if (pathFromStation != null && pathFromStation.size() < shortestDistance) {
-                        shortestDistance = pathFromStation.size();
+                    Object[] pathFromStationAndDistance = findPathWithLowestPower(station[0], station[1], cell.getX(),
+                            cell.getY());
+                    @SuppressWarnings("unchecked")
+                    List<int[]> pathFromStation = (List<int[]>) pathFromStationAndDistance[0];
+                    double distance = (double) pathFromStationAndDistance[1];
+                    if (pathFromStation != null && distance < shortestDistance) {
+                        shortestDistance = distance;
                         shortestPath = pathFromStation;
                     }
                 }
-                
+
                 if (shortestPath != null) {
                     cell.setWayToChargingStation(shortestPath);
+                    cell.setDistanceToStation(shortestDistance);
                 }
             }
         }
@@ -333,109 +357,103 @@ public class NavigationService {
     private List<int[]> findAllChargingStations() {
         List<int[]> stations = new ArrayList<>();
         int size = floorMap.getCells().length;
-        
+
         // Add the four corner charging stations
-        stations.add(new int[]{0, 0});           // Top-left
-        stations.add(new int[]{0, size-1});      // Top-right
-        stations.add(new int[]{size-1, 0});      // Bottom-left
-        stations.add(new int[]{size-1, size-1}); // Bottom-right
-        
+        stations.add(new int[] { 0, 0 }); // Top-left
+        stations.add(new int[] { 0, size - 1 }); // Top-right
+        stations.add(new int[] { size - 1, 0 }); // Bottom-left
+        stations.add(new int[] { size - 1, size - 1 }); // Bottom-right
+
         return stations;
     }
 
     /**
-     * Implements Dijkstra's algorithm to find the shortest path between two points.
+     * Implements Dijkstra's algorithm to find the path with lowest power between
+     * two points.
      * Avoids obstacles and considers valid moves only.
      */
-    private List<int[]> findShortestPath(int startX, int startY, int targetX, int targetY) {
+    private Object[] findPathWithLowestPower(int startX, int startY, int targetX, int targetY) {
         int rows = floorMap.getCells().length;
         int cols = floorMap.getCells()[0].length;
-        
+
         // Initialize distances and visited array
-        int[][] distances = new int[rows][cols];
+        double[][] distances = new double[rows][cols];
         boolean[][] visited = new boolean[rows][cols];
         // Change to store parent coordinates as a 2D array of Point objects
         Point[][] parent = new Point[rows][cols];
-        
+
         // Initialize distances to infinity
         for (int i = 0; i < rows; i++) {
             Arrays.fill(distances[i], Integer.MAX_VALUE);
         }
-        
+
         // Priority queue to store cells to visit (distance, x, y)
-        PriorityQueue<int[]> pq = new PriorityQueue<>((a, b) -> a[0] - b[0]);
-        
+        PriorityQueue<Node> pq = new PriorityQueue<>((a, b) -> Double.compare(a.dist, b.dist));
+
         // Start from charging station
         distances[startX][startY] = 0;
-        pq.offer(new int[]{0, startX, startY});
-        
+        pq.offer(new Node(0, startX, startY));
         while (!pq.isEmpty()) {
-            int[] current = pq.poll();
-            int x = current[1];
-            int y = current[2];
-            
-            if (visited[x][y]) continue;
+            Node current = pq.poll();
+            double currentCost = current.dist;
+            int x = current.x;
+            int y = current.y;
+            Cell currentCell = floorMap.getCells()[x][y];
+            if (visited[x][y])
+                continue;
             visited[x][y] = true;
-            
             // If we reached the target cell
             if (x == targetX && y == targetY) {
                 return reconstructPath(parent, startX, startY, targetX, targetY);
             }
-            
+
             // Check all four directions
             for (Direction direction : Direction.values()) {
                 int newX = x + direction.getXOffset();
                 int newY = y + direction.getYOffset();
-                
+
                 if (isValidMove(newX, newY) && !visited[newX][newY] && !sensorSimulatorService.isObstacle(newX, newY)) {
-                    int newDist = distances[x][y] + 1;
-                    
+                    Cell nextCell = floorMap.getCells()[newX][newY];
+                    // weight is moving power cost
+                    double newDist = currentCost + sensorSimulatorService.getMovingPowerCost(currentCell, nextCell);
                     if (newDist < distances[newX][newY]) {
                         distances[newX][newY] = newDist;
-                        parent[newX][newY] = new Point(x, y);  // Store parent coordinates as Point
-                        pq.offer(new int[]{newDist, newX, newY});
+                        parent[newX][newY] = new Point(x, y); // Store parent coordinates as Point
+                        pq.offer(new Node(newDist, newX, newY));
                     }
                 }
             }
         }
-        
-        return null; // No path found
-    }
 
-    /**
-     * Helper class to store coordinates for path reconstruction.
-     */
-    private static class Point {
-        int x, y;
-        
-        Point(int x, int y) {
-            this.x = x;
-            this.y = y;
-        }
+        return new Object[] { null, 0.0 }; // No path found
     }
 
     /**
      * Reconstructs the path from parent pointers after pathfinding.
      */
-    private List<int[]> reconstructPath(Point[][] parent, int startX, int startY, int targetX, int targetY) {
+    private Object[] reconstructPath(Point[][] parent, int startX, int startY, int targetX, int targetY) {
         List<int[]> path = new ArrayList<>();
         int currentX = targetX;
         int currentY = targetY;
-        
+        double distance = 0.0;
+
         // Build path from target back to start
         while (currentX != startX || currentY != startY) {
-            path.add(0, new int[]{currentX, currentY});
+            path.add(0, new int[] { currentX, currentY });
             Point p = parent[currentX][currentY];
             if (p == null) {
                 return null; // No valid path exists
             }
+            Cell curCell = floorMap.getCells()[currentX][currentY];
+            Cell nxtCell = floorMap.getCells()[p.x][p.y];
+            distance = distance + sensorSimulatorService.getMovingPowerCost(curCell, nxtCell);
             currentX = p.x;
             currentY = p.y;
         }
-        
+
         // Add the starting point
-        path.add(0, new int[]{startX, startY});
-        return path;
+        path.add(0, new int[] { startX, startY });
+        return new Object[] { path, distance };
     }
 
     /**
@@ -444,28 +462,4 @@ public class NavigationService {
     private boolean isAtAnyChargingStation() {
         return floorMap.getCells()[currentX][currentY].isChargingStation();
     }
-
-    /**
-     * Calculates the battery power needed to reach the nearest charging station.
-     */
-    private int getBatteryNeededToNearestStation() {
-        Cell nearestStation = findNearestChargingStationCell(currentX, currentY);
-        if (nearestStation == null) return Integer.MAX_VALUE;
-        
-        List<int[]> pathToStation = floorMap.getCells()[currentX][currentY].getWayToChargingStation();
-        if (pathToStation == null) return Integer.MAX_VALUE;
-        
-        return pathToStation.size() * 2; // Consider the basic consumption of each cell in the path
-    }
-
-    /**
-     * Returns the Cell object of the nearest charging station.
-     */
-    private Cell findNearestChargingStationCell(int x, int y) {
-        int[] nearest = findNearestChargingStation(x, y);
-        return floorMap.getCells()[nearest[0]][nearest[1]];
-    }
 }
-
-
-
