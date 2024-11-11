@@ -234,12 +234,17 @@ public class NavigationService {
             dirtService.cleanDirt(currentX, currentY);
         }
 
+        boolean isCleanAll = sensorSimulatorService.isCleanAll(dirtService.getCleanedDirtCellCount());
+
         // Check if returning to the charging station is needed
-        if (dirtService.isFullDirt() || batteryService.isRechargeNeeded(currentCell.getDistanceToStation())) {
+        if (isCleanAll || dirtService.isFullDirt() || batteryService.isRechargeNeeded(currentCell.getDistanceToStation())) {
             // Store the last cleaning position
             lastCleaningX = currentX;
             lastCleaningY = currentY;
-
+            // If all dirts cells are cleaned, robot stops cleaning and comes back the best station
+            if (isCleanAll){
+                stack.clear();
+            }
             dirtService.stopCleaningMode();
             if (currentCell.getWayToChargingStation() != null) {
                 stationPath = new ArrayList<>(currentCell.getWayToChargingStation());

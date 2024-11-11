@@ -31,6 +31,8 @@ public class DirtService {
 
     private int mode = 0; // 0 is cleaning, 1 is stop cleaning
 
+    private int cleanedDirtCellCount = 0;
+
     /**
      * Cleans dirt at the specified coordinates if dirt is present and capacity allows.
      */
@@ -42,6 +44,7 @@ public class DirtService {
             // Reduce dirt
             cell.reduceDirtLevel();  // Clean up dirt
             currentCapacity++;
+            cleanedDirtCellCount++;
             activityLogger.logCleaning(x, y);
 
             if (currentCapacity >= dirtCapacity) {

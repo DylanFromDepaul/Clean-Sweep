@@ -27,11 +27,14 @@ public class SensorSimulatorService implements Sensor {
     @Value("${clean-sweep.floor-grid-size}")
     private int gridSize;
 
+    private int numberOfDirtCell;
+
     @PostConstruct
     public void initializeObstacleAndDirt() {
         floorMap.initializeGrid(gridSize);
         this.obstacleGrid = generateObstacles(gridSize, gridSize);
         this.chargingStationGrid = generateChargingStations(gridSize, gridSize);
+        this.numberOfDirtCell = 0;
 
         Random random = new Random();
         for (int x = 0; x < gridSize; x++) {
@@ -57,6 +60,7 @@ public class SensorSimulatorService implements Sensor {
                     }
                     if (random.nextInt(3) != 0){
                         cell.setDirtLevel(1);
+                        numberOfDirtCell++;
                     }
                 }
             }
@@ -166,6 +170,13 @@ public class SensorSimulatorService implements Sensor {
             default:
                 return 0;
         }
+    }
+
+    /**
+     * Checks if all dirt cells are cleaned
+     */
+    public boolean isCleanAll(int cleanedDirtCellCount){
+        return numberOfDirtCell == cleanedDirtCellCount;
     }
 
     /**
